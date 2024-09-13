@@ -1,0 +1,56 @@
+-- Load the text file
+books = LOAD '/user/cloudera/merged_books.txt' USING PigStorage(' ') AS (line:chararray);
+
+-- Convert to lowercase and replace non-alphabetic characters with spaces to preserve word boundaries
+cleaned_lines = FOREACH books GENERATE
+    REPLACE(LOWER(line), '[^a-zA-Z]', ' ') AS cleaned_line;
+
+-- Tokenize the text into words
+words = FOREACH cleaned_lines GENERATE FLATTEN(TOKENIZE(cleaned_line)) AS word;
+
+-- Remove leading and trailing spaces, and filter out short and nonsensical words
+cleaned_words = FOREACH words GENERATE TRIM(word) AS word;
+filtered_words = FILTER cleaned_words BY SIZE(word) > 2 AND
+    word != 'i' AND word != 'me' AND word != 'my' AND word != 'myself' AND
+    word != 'we' AND word != 'our' AND word != 'ours' AND word != 'ourselves' AND
+    word != 'you' AND word != 'your' AND word != 'yours' AND word != 'yourself' AND
+    word != 'yourselves' AND word != 'he' AND word != 'him' AND word != 'his' AND
+    word != 'himself' AND word != 'she' AND word != 'her' AND word != 'hers' AND
+    word != 'herself' AND word != 'it' AND word != 'its' AND word != 'itself' AND
+    word != 'they' AND word != 'them' AND word != 'their' AND word != 'theirs' AND
+    word != 'themselves' AND word != 'what' AND word != 'which' AND word != 'who' AND
+    word != 'whom' AND word != 'this' AND word != 'that' AND word != 'these' AND
+    word != 'those' AND word != 'am' AND word != 'is' AND word != 'are' AND
+    word != 'was' AND word != 'were' AND word != 'be' AND word != 'been' AND
+    word != 'being' AND word != 'have' AND word != 'has' AND word != 'had' AND
+    word != 'having' AND word != 'do' AND word != 'does' AND word != 'did' AND
+    word != 'doing' AND word != 'a' AND word != 'an' AND word != 'the' AND
+    word != 'and' AND word != 'but' AND word != 'if' AND word != 'or' AND
+    word != 'because' AND word != 'as' AND word != 'until' AND word != 'while' AND
+    word != 'of' AND word != 'at' AND word != 'by' AND word != 'for' AND
+    word != 'with' AND word != 'about' AND word != 'against' AND word != 'between' AND
+    word != 'into' AND word != 'through' AND word != 'during' AND word != 'before' AND
+    word != 'after' AND word != 'above' AND word != 'below' AND word != 'to' AND
+    word != 'from' AND word != 'up' AND word != 'down' AND word != 'in' AND
+    word != 'out' AND word != 'on' AND word != 'off' AND word != 'over' AND
+    word != 'under' AND word != 'again' AND word != 'further' AND word != 'then' AND
+    word != 'once' AND word != 'here' AND word != 'there' AND word != 'when' AND
+    word != 'where' AND word != 'why' AND word != 'how' AND word != 'all' AND
+    word != 'any' AND word != 'both' AND word != 'each' AND word != 'few' AND
+    word != 'more' AND word != 'most' AND word != 'other' AND word != 'some' AND
+    word != 'such' AND word != 'no' AND word != 'nor' AND word != 'not' AND
+    word != 'only' AND word != 'own' AND word != 'same' AND word != 'so' AND
+    word != 'than' AND word != 'too' AND word != 'very' AND word != 's' AND
+    word != 't' AND word != 'can' AND word != 'will' AND word != 'just' AND
+    word != 'don' AND word != 'should' AND word != 'now';
+
+-- Filter out additional nonsensical words (optional)
+-- Example: Remove words that are too long or contain uncommon patterns
+filtered_words = FILTER filtered_words BY SIZE(word) < 15; -- Optional length filter
+
+-- Group the words and count occurrences
+grouped_words = GROUP filtered_words BY word;
+word_count = FOREACH grouped_words GENERATE group AS word, COUNT(filtered_words) AS count;
+
+-- Store the result as a CSV file
+STORE word_count INTO '/user/cloudera/cleaned_word_count.csv' USING PigStorage(',');

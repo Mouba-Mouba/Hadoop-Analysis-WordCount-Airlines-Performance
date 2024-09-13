@@ -1,0 +1,52 @@
+CREATE TABLE book_data (
+    line STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\n'
+LINES TERMINATED BY '\n'
+STORED AS TEXTFILE;
+
+-- Load data from the file into the table
+LOAD DATA INPATH '/user/cloudera/merged_books.txt' INTO TABLE book_data;
+
+
+CREATE TABLE stop_words (
+    stop_word STRING
+)
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY '\n'
+LINES TERMINATED BY '\n'
+STORED AS TEXTFILE;
+
+-- Load data from the file into the table
+LOAD DATA INPATH '/user/cloudera/stop_words.txt' INTO TABLE stop_words;
+
+
+CREATE VIEW cleaned_text AS
+SELECT
+    regexp_replace(
+        regexp_replace(lower(line), '[0-9]', ''), -- Remove numbers
+        '[()\-_"''\[\]{}]', '' -- Remove special characters
+    ) AS cleaned_line
+FROM book_data;
+
+
+CREATE VIEW word_tokens AS
+SELECT
+    explode(
+        split(cleaned_line, '\\s+') -- Split on whitespace and explode into rows
+    ) AS word
+FROM cleaned_text;
+
+
+CREATE TABLE word_count AS
+SELECT
+    w.word,
+    COUNT(*) AS count
+FROM word_tokens w
+LEFT OUTER JOIN stop_words s
+ON w.word = s.stop_word
+WHERE s.stop_word IS NULL -- Exclude stop words
+AND w.word != '' -- Exclude empty rows
+GROUP BY w.word
+ORDER BY count DESC; -- Optional: Order by frequency
